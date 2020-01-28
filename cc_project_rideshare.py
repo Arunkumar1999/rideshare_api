@@ -24,14 +24,16 @@ cursor.execute("""
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS place(
       id int primary key,
-		  name varchar(20)
+	  name varchar(20)
     );
 """)
 with open('AreaNameEnum.csv') as File:  
 	reader = csv.reader(File)
 	#print(reader)
+
 	i=0
 	for row in reader:
+		#print(row[0],row[1])
 		if(i):
 			#print(row)
 			try:
@@ -71,6 +73,41 @@ def fun(passw):
 			return 0
 	return 1
 
+
+@app.route("/api/v1/db/read",methods=["POST"])
+def read_database():
+	cursor = sqlite3.connect("rideshare.db")
+	val=request.get_json()["insert"]
+	table=request.get_json()["table"].encode("utf8")
+	column=request.get_json()["column"]
+	r=""
+	s=""
+	e=len(column)-1
+	for i in range(e):
+		r+=column[i].encode("utf8")+","
+		s+="?,"
+	r+=column[e].encode("utf8")
+	s+="?"
+	for i in range(len(val)):
+		val[i]=val[i].encode("utf8")
+
+	#try:
+	sql="select * from users where "+column[0]+"=(?)"
+	print(sql)
+	#et=cursor.execute(sql,(delete,))
+	resp=cursor.execute(sql,(val[0],))
+	#print(val[0])
+	print(resp)
+	resp_check=resp.fetchone()
+	print(resp_check)
+	if(resp_check== None):
+		#print("user does not exists")
+		return jsonify(0)
+	#except:
+	else:
+		print("user does exists from read_Db")
+		return jsonify(1)
+
 @app.route("/api/v1/db/write",methods=["POST"])
 def to_database():
 	indicate=request.get_json()["indicate"]
@@ -100,7 +137,7 @@ def to_database():
 
 			sql="insert into "+table+" ("+r+")"+" values ("+s+")"
 			#sql="insert into users (name,pass) values ('dsfs','sdf')"
-			print("dfs",table,column,s,val,sql)
+			#print("dfs",table,column,s,val,sql)
 			#print(sql,type((table.encode("utf8"))),r)
 			cursor.execute(sql,val)
 			#cursor.execute(sql)
@@ -110,13 +147,13 @@ def to_database():
 			sql="select * from "+table
 			et=cursor.execute(sql)
 			rows = et.fetchall()
-			for row in rows:
-				print(row,"qer")
+			# for row in rows:
+			# 	print(row,"qer")
 			sql="select * from users"
 			et=cursor.execute(sql)
 			rows = et.fetchall()
-			for row in rows:
-				print(row,"q")			
+			# for row in rows:
+			# 	print(row,"q")			
 		except:
 			sql="select * from "+table
 			et=cursor.execute(sql)
@@ -189,6 +226,10 @@ def insert_rider():
 	destination=request.get_json()["destination"]
 	d=[name,passw,source,destination]
 	#print(dsd)
+	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides"})
+	if(read_res.json()==0):
+		abort(400,"user name doesn't exists");
+
 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides","indicate":"0"})
 	#if(name in d ):
 		# rides.append({"rideId":rides_id,"username":name,"timestamp":passw,"source":source.keys()[0],"destination":destination.keys()[0]})
