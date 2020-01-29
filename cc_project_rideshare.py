@@ -22,6 +22,16 @@ cursor.execute("""
     """)
 
 cursor.execute("""
+        CREATE TABLE IF NOT EXISTS rideusers(
+         id int not null,
+  		 name varchar(20),
+		foreign key (name) references users(name) on delete cascade,
+		foreign key (id) references rides(rideid) on delete cascade,
+		primary key(id,name)
+        );
+    """)
+
+cursor.execute("""
     CREATE TABLE IF NOT EXISTS place(
       id int primary key,
 	  name varchar(20)
@@ -77,6 +87,7 @@ def fun(passw):
 @app.route("/api/v1/db/read",methods=["POST"])
 def read_database():
 	cursor = sqlite3.connect("rideshare.db")
+	resp_dict={}
 	val=request.get_json()["insert"]
 	table=request.get_json()["table"].encode("utf8")
 	column=request.get_json()["column"]
@@ -92,28 +103,41 @@ def read_database():
 		val[i]=val[i].encode("utf8")
 
 	#try:
-	sql="select * from users where "+column[0]+"=(?)"
+	sql="select "+r+" from "+table+" where "+column[0]+"=(?)"
 	print(sql)
 	#et=cursor.execute(sql,(delete,))
 	resp=cursor.execute(sql,(val[0],))
 	#print(val[0])
 	print(resp)
-	resp_check=resp.fetchone()
-	print(resp_check)
-	if(resp_check== None):
-		#print("user does not exists")
-		return jsonify(0)
-	#except:
+	resp_check=resp.fetchall()
+	#print(resp_check)
+	if(len(resp_check)== 0):
+		resp_dict["response"]=0
+		return json.dumps(resp_dict)
 	else:
+		
+		print(resp_check)
+		print(list(resp_check[0]))
+		print(len(resp_check),"count of all rows")
+		resp_dict["count"]=len(resp_check)
+		for i in range(len(resp_check)):
+			#print("inside for loop")
+			for j in range(len(column)):
+				resp_dict[column[j]]=list(resp_check[i])[j]
+		print(resp_dict,"hii i am dict")
 		print("user does exists from read_Db")
-		return jsonify(1)
+		resp_dict["response"]=1
+		return json.dumps(resp_dict)
 
 @app.route("/api/v1/db/write",methods=["POST"])
 def to_database():
+	
 	indicate=request.get_json()["indicate"]
 	#print(indicate.encode("utf8")=='0')
 	#return jsonify(2)
 	cursor = sqlite3.connect("rideshare.db")
+	cursor.execute("PRAGMA FOREIGN_KEYS=on")
+	cursor.commit()
 	if(indicate.encode("utf8")=='0'):
 		val=request.get_json()["insert"]
 		table=request.get_json()["table"].encode("utf8")
@@ -173,10 +197,14 @@ def to_database():
 			#print(et.fetchone())
 			if(not et.fetchone()):
 				return jsonify(0)
+			
 			sql = "DELETE from "+table+" WHERE "+column+"=(?)"
+			print(sql)
+			c1 = cursor.cursor()
 			et=cursor.execute(sql,(delete,))
-			#print(et)
+			print(et.fetchall())
 			cursor.commit()
+			#cursor.close()
 		except:
 			#print("dssf")
 			return jsonify(0)
@@ -226,9 +254,9 @@ def insert_rider():
 	destination=request.get_json()["destination"]
 	d=[name,passw,source,destination]
 	#print(dsd)
-	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides"})
-	if(read_res.json()==0):
-		abort(400,"user name doesn't exists");
+	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users"})
+	if(read_res.json().get("response")==0):
+		abort(400,"user name doesn't exists")
 
 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides","indicate":"0"})
 	#if(name in d ):
@@ -263,11 +291,60 @@ def remove(name):
 	#if(name in d ):
 	#	del d[name]	
 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"users","delete":name,"column":"name","indicate":"1"})
+	# res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"rides","delete":name,"column":"name","indicate":"1"})
 	if(res.json()==0):
 		abort(400,"user does not  exists")
 	elif(res.json()==1):
 		return json.dumps({'success':"user has been deleted successfully"}), 200, {'ContentType':'application/json'}
 
+@app.route("/api/v1/rides/<rideId>",methods=["DELETE"])
+def delete_rideId(rideId):
+	#access book name sent as JSON object 
+	#in POST request body
+	#name=request.get_json()["username"]
+	#passw=request.get_json()["password"]f
+	#if(name in d ):
+	#	del d[name]	
+	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"rides","delete":rideId,"column":"rideid","indicate":"1"})
+	if(res.json()==0):
+		abort(400,"rideId does not  exists")
+	elif(res.json()==1):
+		return json.dumps({'success':"deleted successfully"}), 200, {'ContentType':'application/json'}
+
+@app.route("/api/v1/rides/<rideId>",methods=["POST"])
+def join_ride(rideId):
+	name=request.get_json()["username"]
+	d=[name,rideId]
+	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users"})
+	if(read_res.json().get("response")==0):
+		abort(400,"user doesn't exists")
+	d=[rideId,name]
+	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti"],"table":"rides"})
+	if(rideid_check.json().get("response")==0):
+		abort(400,"ride id doesn't exists")
+	
+	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["id","name"],"table":"rideusers","indicate":"0"})
+	if(res.json()==0):
+		abort(400,"rideId does not  exists")
+	elif(res.json()==1):
+		return json.dumps({'success':"joined successfully"}), 200, {'ContentType':'application/json'}
+
+@app.route("/api/v1/rides/<rideId>",methods=["GET"])
+def ride_details(rideId):
+	#access book name sent as JSON object 
+	#in POST request body
+	#name=request.get_json()["username"]
+	#passw=request.get_json()["password"]f
+	#if(name in d ):
+	#	del d[name]	
+	d=[rideId]
+	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides"})
+	if(rideid_check.json().get("response")==0):
+		abort(400,"rideId does not  exists")
+	elif(rideid_check.json().get("response")==1):
+		return json.dumps({"rideId":rideid_check.json().get("rideid"),"created_by":rideid_check.json().get("name"),
+							"users":rideid_check.json().get("name"),
+							"timestamp":rideid_check.json().get("timest")}), 200, {'ContentType':'application/json'}
 
 app.debug=True
 app.run()
