@@ -110,8 +110,9 @@ def read_database():
 	#print(val[0])
 	print(resp)
 	resp_check=resp.fetchall()
-	#print(resp_check)
-	if(len(resp_check)== 0):
+	print(len(resp_check),"length of resp_check")
+	print(resp_check)
+	if(len(resp_check) == 0):
 		resp_dict["response"]=0
 		return json.dumps(resp_dict)
 	else:
@@ -123,7 +124,8 @@ def read_database():
 		for i in range(len(resp_check)):
 			#print("inside for loop")
 			for j in range(len(column)):
-				resp_dict[column[j]]=list(resp_check[i])[j]
+				#resp_dict[column[j]] = resp_dict[column[j]].append(list(resp_check[i])[j])            #example.setdefault('a', []).append('apple')
+				resp_dict.setdefault(column[j],[]).append(list(resp_check[i])[j])
 		print(resp_dict,"hii i am dict")
 		print("user does exists from read_Db")
 		resp_dict["response"]=1
@@ -242,6 +244,8 @@ rides=[]
 rides_id=0
 sour={}
 des={}
+# def check_timestamp(timestamp):
+	
 
 @app.route("/api/v1/rides",methods=["POST"])
 def insert_rider():
@@ -249,10 +253,13 @@ def insert_rider():
 	#in POST request body
 	global rides_id
 	name=request.get_json()["created_by"]
-	passw=request.get_json()["timestamp"]
+	timestamp=request.get_json()["timestamp"]
 	source=request.get_json()["source"]
 	destination=request.get_json()["destination"]
-	d=[name,passw,source,destination]
+    
+	# if(check_timestamp(timestamp)==0):
+	# 	abort(400,"wrong format")
+	d=[name,timestamp,source,destination]
 	#print(dsd)
 	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users"})
 	if(read_res.json().get("response")==0):
@@ -337,14 +344,49 @@ def ride_details(rideId):
 	#passw=request.get_json()["password"]f
 	#if(name in d ):
 	#	del d[name]	
+	users=""
 	d=[rideId]
+	user_list=[]
 	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides"})
 	if(rideid_check.json().get("response")==0):
 		abort(400,"rideId does not  exists")
 	elif(rideid_check.json().get("response")==1):
-		return json.dumps({"rideId":rideid_check.json().get("rideid"),"created_by":rideid_check.json().get("name"),
-							"users":rideid_check.json().get("name"),
-							"timestamp":rideid_check.json().get("timest")}), 200, {'ContentType':'application/json'}
+		
+		joined_users_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["id","name"],"table":"rideusers"})
+		#print(len(joined_users_check.json().get("name")),"length of rideusers")
+		# if(joined_users_check.json().get("response")==0):
+		# 	# users+=rideid_check.json().get("name")[0]
+		# 	continue
+		# else:
+		# 	user_list=joined_users_check.json().get("name")
+		# 	for i in range(len(user_list)-1):
+		# 		users+=user_list[i]+","
+		# 	users+=user_list[len(user_list)-1]
+
+		return json.dumps({"rideId":rideid_check.json().get("rideid"),
+							"created_by":rideid_check.json().get("name")[0],
+							"users":joined_users_check.json().get("name"),
+							"timestamp":rideid_check.json().get("timest"), 
+							"source":rideid_check.json().get("source"),
+							"destination":rideid_check.json().get("desti")},200, {'ContentType':'application/json'})
+							
+# @app.route("/api/v1/rides/<rideId>",methods=["GET"])
+# def upcoming_rides():
+# 	#access book name sent as JSON object 
+# 	#in POST request body
+# 	#name=request.get_json()["username"]
+# 	#passw=request.get_json()["password"]f
+# 	#if(name in d ):
+# 	#	del d[name]	
+# 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"rides","delete":rideId,"column":"rideid","indicate":"1"})
+# 	if(res.json()==0):
+# 		abort(400,"rideId does not  exists")
+# 	elif(res.json()==1):
+# 		return json.dumps({'success':"deleted successfully"}), 200, {'ContentType':'application/json'}
+
+							
+							
+							
 
 app.debug=True
 app.run()
