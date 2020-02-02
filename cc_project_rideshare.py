@@ -3,15 +3,10 @@ from flask import Flask, render_template,jsonify,request,abort,Response
 import requests
 import json
 import csv
+
+from datetime import datetime
 app=Flask(__name__)
 cursor = sqlite3.connect("rideshare.db")
-#cursor = conn.cursor()
-#cursor.execute("create database if not exists rideshare;")
-#cursor.execute("create database if not exists rideshare")
-#cursor.execute("(select * from INFORMATION_SCHEMA.TABLES where table_name='specialtopic') ;")
-
-
-
 
 
 cursor.execute("""
@@ -39,22 +34,15 @@ cursor.execute("""
 """)
 with open('AreaNameEnum.csv') as File:  
 	reader = csv.reader(File)
-	#print(reader)
 
 	i=0
 	for row in reader:
-		#print(row[0],row[1])
 		if(i):
-			#print(row)
 			try:
 				d=[row[0],row[1]]
-				#res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["id","name"],"table":"place","indicate":"0"})		
 				sql="insert into place values (?,?)"
-				#sql="insert into users (name,pass) values ('dsfs','sdf')"
-				#print("dfs",table,column,s,val,sql)
-				#print(sql,type((table.encode("utf8"))),r)
+				
 				cursor.execute(sql,d)
-				#cursor.execute(sql)
 			except:
 				continue	
 		i=1		
@@ -64,7 +52,7 @@ cursor.execute("""
         CREATE TABLE IF NOT EXISTS rides(
           rideid integer  primary key AUTOINCREMENT,
           name varchar(20) not null ,
-  		  timest time not null,
+  		  timest DATETIME not null,
   		  source varchar(30) not null,
   		  desti varchar(30) not null,
   		  foreign key (name) references users(name) on delete cascade, 
@@ -91,6 +79,15 @@ def read_database():
 	val=request.get_json()["insert"]
 	table=request.get_json()["table"].encode("utf8")
 	column=request.get_json()["column"]
+	where_check_cond=request.get_json()["where"]
+	print(where_check_cond[0],"ssssssssssss")
+	check_string=""
+	for i in range(len(where_check_cond)-1):
+		check_string+=where_check_cond[i]+" = "+"'"+val[i]+"'"+" AND "
+	check_string+=where_check_cond[len(where_check_cond)-1]+" = "+"'"+val[len(where_check_cond)-1]+"'"
+	print(check_string,"aaaaaaaaaaaaa")
+		
+
 	r=""
 	s=""
 	e=len(column)-1
@@ -102,16 +99,13 @@ def read_database():
 	for i in range(len(val)):
 		val[i]=val[i].encode("utf8")
 
-	#try:
-	sql="select "+r+" from "+table+" where "+column[0]+"=(?)"
+	
+	sql="select "+r+" from "+table+" where "+check_string+";"
 	print(sql)
-	#et=cursor.execute(sql,(delete,))
-	resp=cursor.execute(sql,(val[0],))
-	#print(val[0])
+	resp=cursor.execute(sql)
 	print(resp)
 	resp_check=resp.fetchall()
 	print(len(resp_check),"length of resp_check")
-	print(resp_check)
 	if(len(resp_check) == 0):
 		resp_dict["response"]=0
 		return json.dumps(resp_dict)
@@ -122,9 +116,7 @@ def read_database():
 		print(len(resp_check),"count of all rows")
 		resp_dict["count"]=len(resp_check)
 		for i in range(len(resp_check)):
-			#print("inside for loop")
 			for j in range(len(column)):
-				#resp_dict[column[j]] = resp_dict[column[j]].append(list(resp_check[i])[j])            #example.setdefault('a', []).append('apple')
 				resp_dict.setdefault(column[j],[]).append(list(resp_check[i])[j])
 		print(resp_dict,"hii i am dict")
 		print("user does exists from read_Db")
@@ -135,8 +127,7 @@ def read_database():
 def to_database():
 	
 	indicate=request.get_json()["indicate"]
-	#print(indicate.encode("utf8")=='0')
-	#return jsonify(2)
+
 	cursor = sqlite3.connect("rideshare.db")
 	cursor.execute("PRAGMA FOREIGN_KEYS=on")
 	cursor.commit()
@@ -154,7 +145,7 @@ def to_database():
 		s+="?"
 		for i in range(len(val)):
 			val[i]=val[i].encode("utf8")
-			#rt=val[1].encode("utf8")
+
 
 				
 		
@@ -162,31 +153,26 @@ def to_database():
 		try:
 
 			sql="insert into "+table+" ("+r+")"+" values ("+s+")"
-			#sql="insert into users (name,pass) values ('dsfs','sdf')"
-			#print("dfs",table,column,s,val,sql)
-			#print(sql,type((table.encode("utf8"))),r)
+
 			cursor.execute(sql,val)
-			#cursor.execute(sql)
+
 
 
 			cursor.commit()
 			sql="select * from "+table
 			et=cursor.execute(sql)
 			rows = et.fetchall()
-			# for row in rows:
-			# 	print(row,"qer")
+
 			sql="select * from users"
 			et=cursor.execute(sql)
 			rows = et.fetchall()
-			# for row in rows:
-			# 	print(row,"q")			
+			
 		except:
 			sql="select * from "+table
 			et=cursor.execute(sql)
 			rows = et.fetchall()
  			for row in rows:
 				print(row,"we")
-			#print("dasd")
 			return jsonify(0)
 		return jsonify(1)
 	elif(indicate.encode("utf8")=='1'):
@@ -196,19 +182,15 @@ def to_database():
 		try:
 			sql="select * from "+table+" WHERE "+column+"=(?)"
 			et=cursor.execute(sql,(delete,))
-			#print(et.fetchone())
 			if(not et.fetchone()):
 				return jsonify(0)
 			
 			sql = "DELETE from "+table+" WHERE "+column+"=(?)"
 			print(sql)
-			c1 = cursor.cursor()
 			et=cursor.execute(sql,(delete,))
 			print(et.fetchall())
 			cursor.commit()
-			#cursor.close()
 		except:
-			#print("dssf")
 			return jsonify(0)
 		return jsonify(1)
 
@@ -216,89 +198,65 @@ def to_database():
 
 @app.route("/api/v1/users",methods=["PUT"])
 def add():
-	#access book name sent as JSON object 
-	#in POST request body
+	if(request.method!="PUT"):
+		abort(405,"method not allowed")
+
 	name=request.get_json()["username"]
 	passw=request.get_json()["password"]
-	#if(name not in d ):
-		#if(fun(passw)):
+
 	d=[name,passw]
-	#d[]=
 	if(fun(passw)==0):
 		abort(400,"password is not correct")
-		#return jsonify(2) #password validation
 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["name","pass"],"table":"users","indicate":"0"})	
-	#print(res=="a",res=="b",res.json()==1,res.json()==0)
-	#return "dsf"
+
 	
-	if(res.json()==2):
-			abort(400,"password is not correct")	
-	elif(res.json()==0):
-		abort(400,"user already exists")
-	#abort (200,"success" )
-	#return json.dumps({'success':"saved"}), 200, {'ContentType':'application/json'}
+	if(res.json()==0):
+			abort(400,"user already exists")	
+	
+
 	return Response("success",status=201,mimetype='application/json')
-#cursor.execute("(select * from INFORMATION_SCHEMA.TABLES where table_name='specialtopic') ;")
-#result = cursor.fetchone()
+
 rides=[]
 rides_id=0
 sour={}
 des={}
-# def check_timestamp(timestamp):
+
 	
 
 @app.route("/api/v1/rides",methods=["POST"])
 def insert_rider():
-	#access book name sent as JSON object 
-	#in POST request body
+	if(request.method!="POST"):
+		abort(405,"method not allowed")
 	global rides_id
 	name=request.get_json()["created_by"]
 	timestamp=request.get_json()["timestamp"]
 	source=request.get_json()["source"]
 	destination=request.get_json()["destination"]
     
-	# if(check_timestamp(timestamp)==0):
-	# 	abort(400,"wrong format")
 	d=[name,timestamp,source,destination]
-	#print(dsd)
-	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users"})
+	print(type(timestamp.encode("utf8")))
+	print(timestamp.encode("utf8"))
+	try:
+		time_object=datetime.strptime(timestamp.encode("utf8"),'%d-%m-%Y:%S-%M-%H')
+	except:
+		abort(400,"invalid input")
+
+	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users","where":["name"]})
 	if(read_res.json().get("response")==0):
 		abort(400,"user name doesn't exists")
 
-	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides","indicate":"0"})
-	#if(name in d ):
-		# rides.append({"rideId":rides_id,"username":name,"timestamp":passw,"source":source.keys()[0],"destination":destination.keys()[0]})
-		# sour.update(source)
-		# des.update(destination)
-		# rides_id+=1
-		# print(sour,des,rides,rides_id)
-	#else:
-	#	abort(400,"user not found")
-	#return (201,"success" )
-	#return json.dumps({'success':"rider has been updated"}), 200, {'ContentType':'application/json'}
-	if(res.json()==2):
-			abort(400,"password is not correct")	
-	elif(res.json()==0):
+	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides","indicate":"0"})	
+	if(res.json()==0):
 		abort(400,"user already exists")
-	#abort (200,"success" )
-	#return json.dumps({'success':"saved"}), 200, {'ContentType':'application/json'}
+
 	return Response("success",status=201,mimetype='application/json')
-#cursor.execute("(select * from INFORMATION_SCHEMA.TABLES where table_name='specialtopic') ;")
-#result = cursor.fetchone()
-#print(d)
 
-
-#REMOVE
 @app.route("/api/v1/users/<name>",methods=["DELETE"])
 def remove(name):
-	#access book name sent as JSON object 
-	#in POST request body
-	#name=request.get_json()["username"]
-	#passw=request.get_json()["password"]f
-	#if(name in d ):
-	#	del d[name]	
+	if(request.method!="DELETE"):
+		abort(405,"method not allowed")
 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"users","delete":name,"column":"name","indicate":"1"})
-	# res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"rides","delete":name,"column":"name","indicate":"1"})
+	
 	if(res.json()==0):
 		abort(400,"user does not  exists")
 	elif(res.json()==1):
@@ -306,12 +264,8 @@ def remove(name):
 
 @app.route("/api/v1/rides/<rideId>",methods=["DELETE"])
 def delete_rideId(rideId):
-	#access book name sent as JSON object 
-	#in POST request body
-	#name=request.get_json()["username"]
-	#passw=request.get_json()["password"]f
-	#if(name in d ):
-	#	del d[name]	
+	if(request.method!="DELETE"):
+		abort(405,"method not allowed")
 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"rides","delete":rideId,"column":"rideid","indicate":"1"})
 	if(res.json()==0):
 		abort(400,"rideId does not  exists")
@@ -320,13 +274,15 @@ def delete_rideId(rideId):
 
 @app.route("/api/v1/rides/<rideId>",methods=["POST"])
 def join_ride(rideId):
+	if(request.method!="POSST"):
+		abort(405,"method not allowed")
 	name=request.get_json()["username"]
 	d=[name,rideId]
-	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users"})
+	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users","where":["name"]})
 	if(read_res.json().get("response")==0):
 		abort(400,"user doesn't exists")
 	d=[rideId,name]
-	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti"],"table":"rides"})
+	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti"],"table":"rides","where":["rideid"]})
 	if(rideid_check.json().get("response")==0):
 		abort(400,"ride id doesn't exists")
 	
@@ -338,30 +294,18 @@ def join_ride(rideId):
 
 @app.route("/api/v1/rides/<rideId>",methods=["GET"])
 def ride_details(rideId):
-	#access book name sent as JSON object 
-	#in POST request body
-	#name=request.get_json()["username"]
-	#passw=request.get_json()["password"]f
-	#if(name in d ):
-	#	del d[name]	
+	if(request.method!="GET"):
+		abort(405,"method not allowed")
 	users=""
 	d=[rideId]
 	user_list=[]
-	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides"})
+	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides","where":["rideid"]})
 	if(rideid_check.json().get("response")==0):
 		abort(400,"rideId does not  exists")
 	elif(rideid_check.json().get("response")==1):
 		
-		joined_users_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["id","name"],"table":"rideusers"})
-		#print(len(joined_users_check.json().get("name")),"length of rideusers")
-		# if(joined_users_check.json().get("response")==0):
-		# 	# users+=rideid_check.json().get("name")[0]
-		# 	continue
-		# else:
-		# 	user_list=joined_users_check.json().get("name")
-		# 	for i in range(len(user_list)-1):
-		# 		users+=user_list[i]+","
-		# 	users+=user_list[len(user_list)-1]
+		joined_users_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["id","name"],"table":"rideusers","where":["id"]})
+
 
 		return json.dumps({"rideId":rideid_check.json().get("rideid"),
 							"created_by":rideid_check.json().get("name")[0],
@@ -370,80 +314,37 @@ def ride_details(rideId):
 							"source":rideid_check.json().get("source"),
 							"destination":rideid_check.json().get("desti")},200, {'ContentType':'application/json'})
 							
-# @app.route("/api/v1/rides/<rideId>",methods=["GET"])
-# def upcoming_rides():
-# 	#access book name sent as JSON object 
-# 	#in POST request body
-# 	#name=request.get_json()["username"]
-# 	#passw=request.get_json()["password"]f
-# 	#if(name in d ):
-# 	#	del d[name]	
-# 	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"rides","delete":rideId,"column":"rideid","indicate":"1"})
-# 	if(res.json()==0):
-# 		abort(400,"rideId does not  exists")
-# 	elif(res.json()==1):
-# 		return json.dumps({'success':"deleted successfully"}), 200, {'ContentType':'application/json'}
+@app.route("/api/v1/rides",methods=["GET"])
+def upcoming_rides():
+	if(request.method!="GET"):
+		abort(405,"method not allowed")
+	array_of_rides=[]
+	dateTimeObj = datetime.now()
+	string=""
+	string+=str(dateTimeObj.day)+"-"+str(dateTimeObj.month)+"-"+str(dateTimeObj.year)+":"+str(dateTimeObj.second)+"-"+str(dateTimeObj.minute)+"-"+str(dateTimeObj.hour)
+	source=request.args.get('source')
+	destination=request.args.get('destination')
+	d=[source,destination]				
+	src_dest_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides","where":['source','desti']})			
+	if(src_dest_check.json().get("response")==0):
+		abort(400,"no ride exists")
+	
+	str_timestmp=src_dest_check.json().get("timest")
+	timestamp1=src_dest_check.json().get("timest")
+	for i in range(len(timestamp1)):
+		t1 = datetime.strptime(timestamp1[i].encode("utf8"), "%d-%m-%Y:%S-%M-%H")
+		t2 = datetime.strptime(string, "%d-%m-%Y:%S-%M-%H")
+		print(t2)
+		print(t1)
+		if(t1>t2):
+			array_of_rides.append({"rideId":src_dest_check.json().get("rideid")[i],
+								"username":src_dest_check.json().get("name")[i],
+								"timestamp":src_dest_check.json().get("timest")[i]})
 
-							
-							
+	return json.dumps(array_of_rides)
 							
 
 app.debug=True
 app.run()
 
 
-'''
-@app.route('/api/v1/resources/books', methods=['GET'])
-def api_filter():
-    query_parameters = request.args
-
-    id = query_parameters.get('id')
-    published = query_parameters.get('published')
-    author = query_parameters.get('author')
-
-    query = "SELECT * FROM books WHERE"
-    to_filter = []
-
-    if id:
-        query += ' id=? AND'
-        to_filter.append(id)
-    if published:
-        query += ' published=? AND'
-        to_filter.append(published)
-    if author:
-        query += ' author=? AND'
-        to_filter.append(author)
-    if not (id or published or author):
-        return page_not_found(404)
-
-    query = query[:-4] + ';'
-
-    conn = sqlite3.connect('books.db')
-    conn.row_factory = dict_factory
-    cur = conn.cursor()
-
-    results = cur.execute(query, to_filter).fetchall()
-
-    return jsonify(results)
-
-app.run()
-'''
-'''
-#input
-{
-	"username":"rakesh",
-	"password":"1234567892015478ac45123654789ba123456012"
-}
-
-
-#2
-{
-	"created_by" : "rakesh",
-
-	"timestamp" : "22-05-0999:12-00-01",
-	
-	"source" : {"21":"bangalore"},
-
-	"destination" : {"32":"hubli"}
-}
-'''
