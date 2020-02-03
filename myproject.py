@@ -70,8 +70,9 @@ def fun(passw):
 		if(not i.isdigit() and not (i.isalpha() and ord('a')<=ord(i) and ord('f')>=ord(i)) ):
 			return 0
 	return 1
-
-
+@app.route("/")
+def hello():
+    return "<h1>hello world</h1>"
 @app.route("/api/v1/db/read",methods=["POST"])
 def read_database():
 	cursor = sqlite3.connect("rideshare.db")
@@ -207,7 +208,7 @@ def add():
 	d=[name,passw]
 	if(fun(passw)==0):
 		abort(400,"password is not correct")
-	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["name","pass"],"table":"users","indicate":"0"})	
+	res=requests.post("http://34.201.201.196/api/v1/db/write",json={"insert":d,"column":["name","pass"],"table":"users","indicate":"0"})	
 
 	
 	if(res.json()==0):
@@ -241,11 +242,11 @@ def insert_rider():
 	except:
 		abort(400,"invalid input")
 
-	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users","where":["name"]})
+	read_res=requests.post("http://34.201.201.196/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users","where":["name"]})
 	if(read_res.json().get("response")==0):
 		abort(400,"user name doesn't exists")
 
-	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides","indicate":"0"})	
+	res=requests.post("http://34.201.201.196/api/v1/db/write",json={"insert":d,"column":["name","timest","source","desti"],"table":"rides","indicate":"0"})	
 	if(res.json()==0):
 		abort(400,"user already exists")
 
@@ -255,7 +256,7 @@ def insert_rider():
 def remove(name):
 	if(request.method!="DELETE"):
 		abort(405,"method not allowed")
-	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"users","delete":name,"column":"name","indicate":"1"})
+	res=requests.post("http://34.201.201.196/api/v1/db/write",json={"table":"users","delete":name,"column":"name","indicate":"1"})
 	
 	if(res.json()==0):
 		abort(400,"user does not  exists")
@@ -266,7 +267,7 @@ def remove(name):
 def delete_rideId(rideId):
 	if(request.method!="DELETE"):
 		abort(405,"method not allowed")
-	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"table":"rides","delete":rideId,"column":"rideid","indicate":"1"})
+	res=requests.post("http://34.201.201.196/api/v1/db/write",json={"table":"rides","delete":rideId,"column":"rideid","indicate":"1"})
 	if(res.json()==0):
 		abort(400,"rideId does not  exists")
 	elif(res.json()==1):
@@ -278,15 +279,15 @@ def join_ride(rideId):
 		abort(405,"method not allowed")
 	name=request.get_json()["username"]
 	d=[name,rideId]
-	read_res=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users","where":["name"]})
+	read_res=requests.post("http://34.201.201.196/api/v1/db/read",json={"insert":d,"column":["name","pass"],"table":"users","where":["name"]})
 	if(read_res.json().get("response")==0):
 		abort(400,"user doesn't exists")
 	d=[rideId,name]
-	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti"],"table":"rides","where":["rideid"]})
+	rideid_check=requests.post("http://34.201.201.196/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti"],"table":"rides","where":["rideid"]})
 	if(rideid_check.json().get("response")==0):
 		abort(400,"ride id doesn't exists")
 	
-	res=requests.post("http://127.0.0.1:5000/api/v1/db/write",json={"insert":d,"column":["id","name"],"table":"rideusers","indicate":"0"})
+	res=requests.post("http://34.201.201.196/api/v1/db/write",json={"insert":d,"column":["id","name"],"table":"rideusers","indicate":"0"})
 	if(res.json()==0):
 		abort(400,"rideId does not  exists")
 	elif(res.json()==1):
@@ -299,12 +300,12 @@ def ride_details(rideId):
 	users=""
 	d=[rideId]
 	user_list=[]
-	rideid_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides","where":["rideid"]})
+	rideid_check=requests.post("http://34.201.201.196/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides","where":["rideid"]})
 	if(rideid_check.json().get("response")==0):
 		abort(400,"rideId does not  exists")
 	elif(rideid_check.json().get("response")==1):
 		
-		joined_users_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["id","name"],"table":"rideusers","where":["id"]})
+		joined_users_check=requests.post("http://34.201.201.196/api/v1/db/read",json={"insert":d,"column":["id","name"],"table":"rideusers","where":["id"]})
 
 
 		return json.dumps({"rideId":rideid_check.json().get("rideid"),
@@ -325,7 +326,7 @@ def upcoming_rides():
 	source=request.args.get('source')
 	destination=request.args.get('destination')
 	d=[source,destination]				
-	src_dest_check=requests.post("http://127.0.0.1:5000/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides","where":['source','desti']})			
+	src_dest_check=requests.post("http://34.201.201.196/api/v1/db/read",json={"insert":d,"column":["rideid","name","source","desti","timest"],"table":"rides","where":['source','desti']})			
 	if(src_dest_check.json().get("response")==0):
 		abort(400,"no ride exists")
 	
